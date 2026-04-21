@@ -30,6 +30,7 @@ Tracked today:
 
 - public `fgof_expect` and `fgof_expect_types` modules
 - PTY-backed `spawn_expect()` and `close_expect()` session lifecycle
+- transcript-backed `wait_for_string()` and `wait_for_match()` helpers
 - initial session, options, and match types
 - stable status and error constants with naming helpers
 - CI and `fpm test` baseline wiring
@@ -41,6 +42,8 @@ Tracked today:
   right foundations to build something ergonomic
 - expect-style workflows are useful for shells, REPLs, installers, and terminal
   integration tests
+- current waits support multiple candidate patterns, default per-session timeouts,
+  and case-sensitive or case-insensitive matching
 
 ## Public API Shape
 
@@ -60,8 +63,10 @@ Public constants:
 - `FGOF_EXPECT_OK`
 - `FGOF_EXPECT_ERR_INVALID_COMMAND`
 - `FGOF_EXPECT_ERR_INVALID_OPTIONS`
+- `FGOF_EXPECT_ERR_INVALID_PATTERN`
 - `FGOF_EXPECT_ERR_SPAWN_FAILED`
 - `FGOF_EXPECT_ERR_CLOSE_FAILED`
+- `FGOF_EXPECT_ERR_SESSION_ENDED`
 - `FGOF_EXPECT_ERR_INTERNAL`
 - `FGOF_EXPECT_STATUS_IDLE`
 - `FGOF_EXPECT_STATUS_MATCHED`
@@ -78,20 +83,33 @@ Current public procedures:
 - `expect_error_name`
 - `expect_status_name`
 - `spawn_expect`
+- `wait_for_match`
+- `wait_for_string`
 
 ## Quick Start
 
 ```fortran
 program demo_expect
-  use fgof_expect, only : close_expect, spawn_expect
-  use fgof_expect_types, only : expect_session
+  use fgof_expect, only : close_expect, clear_expect_options, spawn_expect, wait_for_string
+  use fgof_expect_types, only : FGOF_EXPECT_STATUS_MATCHED, expect_match, expect_options, expect_session
   implicit none
 
+  type(expect_options) :: options
+  type(expect_match) :: match
   type(expect_session) :: session
+  character(len=48) :: argv(2)
 
-  session = spawn_expect("cat")
-  if (session%active) then
-    print *, "session ready"
+  options = clear_expect_options()
+  options%timeout_ms = 500
+
+  argv = ""
+  argv(1) = "-c"
+  argv(2) = "printf 'login:'"
+  session = spawn_expect("sh", argv, options)
+
+  match = wait_for_string(session, "login:")
+  if (match%status == FGOF_EXPECT_STATUS_MATCHED) then
+    print *, "matched:", match%text
   end if
 
   if (.not. close_expect(session)) then
@@ -119,6 +137,8 @@ That is the baseline verification command locally and in CI.
 - focused on expect-style PTY automation, not generic unit-test orchestration
 - `fgof-proc-test` should sit above this package, not inside it
 - `fgof-pty` remains the transport and lifecycle layer underneath this package
+- current matching is string-based; richer regex or DSL layers should stay above
+  this core
 
 ## License
 
