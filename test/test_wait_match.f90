@@ -12,14 +12,14 @@ program test_wait_match
   type(expect_options) :: options
   type(expect_session) :: session
   type(expect_match) :: match
-  character(len=16) :: patterns(2)
-  character(len=2) :: argv(2)
+  character(len=4) :: patterns(2)
+  character(len=32) :: argv(2)
 
   options = clear_expect_options()
   options%timeout_ms = 500
   argv = ""
   argv(1) = "-c"
-  argv(2) = "printf 'one two'"
+  argv(2) = "printf 'one four'"
   session = spawn_expect("sh", argv, options)
 
   match = wait_for_string(session, "one")
@@ -30,11 +30,11 @@ program test_wait_match
 
   patterns = ""
   patterns(1) = "zero"
-  patterns(2) = "two"
+  patterns(2) = "four"
   match = wait_for_match(session, patterns)
   if (match%status /= FGOF_EXPECT_STATUS_MATCHED) error stop "second wait should match later transcript text"
   if (match%pattern_index /= 2) error stop "pattern index should reflect the matched candidate"
-  if (match%text /= "two") error stop "later match should not rematch old transcript text"
+  if (match%text /= "four") error stop "later match should not rematch old transcript text"
 
   if (.not. close_expect(session)) error stop "session should close cleanly after wait tests"
 end program test_wait_match
