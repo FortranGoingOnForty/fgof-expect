@@ -18,3 +18,6 @@ library = true
 implicit-typing = false
 implicit-external = false
 source-form = "free"
+
+[dependencies]
+fgof-pty = { git = "https://github.com/FortranGoingOnForty/fgof-pty.git", tag = "v0.1.0" }

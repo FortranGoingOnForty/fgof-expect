@@ -1,6 +1,14 @@
 module fgof_expect_types
+  use fgof_pty_types, only : pty_session, terminal_size
   implicit none
   private
+
+  integer, parameter, public :: FGOF_EXPECT_OK = 0
+  integer, parameter, public :: FGOF_EXPECT_ERR_INVALID_COMMAND = 10
+  integer, parameter, public :: FGOF_EXPECT_ERR_INVALID_OPTIONS = 11
+  integer, parameter, public :: FGOF_EXPECT_ERR_SPAWN_FAILED = 20
+  integer, parameter, public :: FGOF_EXPECT_ERR_CLOSE_FAILED = 21
+  integer, parameter, public :: FGOF_EXPECT_ERR_INTERNAL = 99
 
   integer, parameter, public :: FGOF_EXPECT_STATUS_IDLE = 0
   integer, parameter, public :: FGOF_EXPECT_STATUS_MATCHED = 1
@@ -10,6 +18,7 @@ module fgof_expect_types
   type, public :: expect_options
     integer :: timeout_ms = 1000
     logical :: case_sensitive = .true.
+    type(terminal_size) :: size = terminal_size()
   end type expect_options
 
   type, public :: expect_match
@@ -20,6 +29,10 @@ module fgof_expect_types
 
   type, public :: expect_session
     logical :: active = .false.
+    type(pty_session) :: pty
+    integer :: error_code = FGOF_EXPECT_OK
+    character(len=:), allocatable :: error_message
+    character(len=:), allocatable :: program
     character(len=:), allocatable :: transcript
   end type expect_session
 
