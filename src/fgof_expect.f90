@@ -356,7 +356,7 @@ contains
     if (.not. valid) return
 
     do i = 1, size(patterns)
-      if (len(patterns(i)) <= 0) then
+      if (len_trim(patterns(i)) <= 0) then
         valid = .false.
         return
       end if
