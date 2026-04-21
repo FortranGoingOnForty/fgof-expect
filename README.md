@@ -24,13 +24,15 @@ Future scope:
 
 ## Status
 
-Initial scaffold is in place.
+First real expect core is in place.
 
 Tracked today:
 
 - public `fgof_expect` and `fgof_expect_types` modules
 - PTY-backed `spawn_expect()` and `close_expect()` session lifecycle
 - transcript-backed `wait_for_string()` and `wait_for_match()` helpers
+- `send_text()` and `send_line()` helpers for interactive request or response flows
+- transcript and last-match helpers for diagnostics and incremental automation
 - initial session, options, and match types
 - stable status and error constants with naming helpers
 - CI and `fpm test` baseline wiring
@@ -78,11 +80,16 @@ Current public procedures:
 - `clear_expect_match`
 - `clear_expect_options`
 - `clear_expect_session`
+- `clear_transcript`
 - `close_expect`
 - `expect_backend_name`
 - `expect_error_name`
 - `expect_status_name`
+- `last_expect_match`
+- `send_line`
+- `send_text`
 - `spawn_expect`
+- `transcript_text`
 - `wait_for_match`
 - `wait_for_string`
 
@@ -90,7 +97,8 @@ Current public procedures:
 
 ```fortran
 program demo_expect
-  use fgof_expect, only : close_expect, clear_expect_options, spawn_expect, wait_for_string
+  use fgof_expect, only : &
+    close_expect, clear_expect_options, send_line, spawn_expect, transcript_text, wait_for_string
   use fgof_expect_types, only : FGOF_EXPECT_STATUS_MATCHED, expect_match, expect_options, expect_session
   implicit none
 
@@ -109,8 +117,12 @@ program demo_expect
 
   match = wait_for_string(session, "login:")
   if (match%status == FGOF_EXPECT_STATUS_MATCHED) then
-    print *, "matched:", match%text
+    if (.not. send_line(session, "guest")) then
+      print *, session%error_message
+    end if
   end if
+
+  print *, transcript_text(session)
 
   if (.not. close_expect(session)) then
     print *, session%error_message
@@ -139,6 +151,8 @@ That is the baseline verification command locally and in CI.
 - `fgof-pty` remains the transport and lifecycle layer underneath this package
 - current matching is string-based; richer regex or DSL layers should stay above
   this core
+- transcripts record raw terminal output, so interactive children may echo input
+  back into the transcript depending on their terminal mode
 
 ## License
 
