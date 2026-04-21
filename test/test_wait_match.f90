@@ -5,6 +5,7 @@ program test_wait_match
     clear_expect_options, &
     exact_pattern, &
     wait_for_match, &
+    wait_for_exact_string, &
     wait_for_string, &
     spawn_expect
   use fgof_expect_types, only : expect_match, expect_options, expect_pattern, expect_session
@@ -43,8 +44,8 @@ program test_wait_match
   argv(1) = "-c"
   argv(2) = "printf 'login: '"
   session = spawn_expect("sh", argv, options)
-  match = wait_for_string(session, "login: ")
-  if (match%status /= FGOF_EXPECT_STATUS_MATCHED) error stop "wait_for_string should preserve trailing-space prompts"
+  match = wait_for_exact_string(session, "login: ")
+  if (match%status /= FGOF_EXPECT_STATUS_MATCHED) error stop "wait_for_exact_string should preserve trailing-space prompts"
   if (match%text /= "login: ") error stop "exact string waits should preserve trailing spaces"
   if (.not. close_expect(session)) error stop "exact string wait session should close cleanly"
 

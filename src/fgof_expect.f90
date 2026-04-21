@@ -68,6 +68,7 @@ module fgof_expect
     send_text, &
     transcript_text, &
     trimmed_pattern, &
+    wait_for_exact_string, &
     wait_for_match, &
     wait_for_string
   public :: spawn_expect
@@ -213,9 +214,20 @@ contains
     type(expect_match) :: match
     type(expect_pattern) :: patterns(1)
 
-    patterns(1) = exact_pattern(pattern)
+    patterns(1) = trimmed_pattern(pattern)
     match = wait_for_match_specs(session, patterns, timeout_ms)
   end function wait_for_string
+
+  function wait_for_exact_string(session, pattern, timeout_ms) result(match)
+    type(expect_session), intent(inout) :: session
+    character(len=*), intent(in) :: pattern
+    integer, intent(in), optional :: timeout_ms
+    type(expect_match) :: match
+    type(expect_pattern) :: patterns(1)
+
+    patterns(1) = exact_pattern(pattern)
+    match = wait_for_match_specs(session, patterns, timeout_ms)
+  end function wait_for_exact_string
 
   function wait_for_match_strings(session, patterns, timeout_ms) result(match)
     type(expect_session), intent(inout) :: session
