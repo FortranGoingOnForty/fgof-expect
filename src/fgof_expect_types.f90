@@ -38,6 +38,7 @@ module fgof_expect_types
     integer :: scan_start = 1
     integer :: error_code = FGOF_EXPECT_OK
     character(len=:), allocatable :: error_message
+    type(expect_match) :: last_match
     character(len=:), allocatable :: program
     character(len=:), allocatable :: transcript
   end type expect_session

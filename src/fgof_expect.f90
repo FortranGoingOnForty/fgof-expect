@@ -10,7 +10,8 @@ module fgof_expect
     close_pty, &
     pty_backend_name, &
     read_some, &
-    spawn_pty
+    spawn_pty, &
+    write_all
   use fgof_expect_types, only : &
     FGOF_EXPECT_ERR_CLOSE_FAILED, &
     FGOF_EXPECT_ERR_INTERNAL, &
@@ -46,6 +47,7 @@ module fgof_expect
     clear_expect_match, &
     clear_expect_options, &
     clear_expect_session, &
+    clear_transcript, &
     close_expect, &
     expect_match, &
     expect_options, &
@@ -53,6 +55,10 @@ module fgof_expect
     expect_backend_name, &
     expect_error_name, &
     expect_status_name, &
+    last_expect_match, &
+    send_line, &
+    send_text, &
+    transcript_text, &
     wait_for_match, &
     wait_for_string
   public :: spawn_expect
@@ -84,6 +90,7 @@ contains
     session%scan_start = 1
     session%error_code = FGOF_EXPECT_OK
     session%error_message = ""
+    session%last_match = clear_expect_match()
     session%program = ""
     session%transcript = ""
   end function clear_expect_session
@@ -184,6 +191,58 @@ contains
     patterns(1) = pattern
     match = wait_for_match(session, patterns, timeout_ms)
   end function wait_for_string
+
+  logical function send_text(session, text) result(success)
+    type(expect_session), intent(inout) :: session
+    character(len=*), intent(in) :: text
+
+    call clear_error(session)
+    call sync_active_state(session)
+
+    if (.not. session%pty%is_open) then
+      call set_error(session, FGOF_EXPECT_ERR_SESSION_ENDED, "expect session is not open")
+      success = .false.
+      return
+    end if
+
+    success = write_all(session%pty, text)
+    call sync_active_state(session)
+    if (.not. success) then
+      call sync_pty_error(session)
+    end if
+  end function send_text
+
+  logical function send_line(session, text) result(success)
+    type(expect_session), intent(inout) :: session
+    character(len=*), intent(in) :: text
+
+    success = send_text(session, text // new_line("a"))
+  end function send_line
+
+  subroutine clear_transcript(session)
+    type(expect_session), intent(inout) :: session
+
+    session%transcript = ""
+    session%scan_start = 1
+  end subroutine clear_transcript
+
+  function transcript_text(session) result(text)
+    type(expect_session), intent(in) :: session
+    character(len=:), allocatable :: text
+
+    if (allocated(session%transcript)) then
+      text = session%transcript
+    else
+      text = ""
+    end if
+  end function transcript_text
+
+  function last_expect_match(session) result(match)
+    type(expect_session), intent(in) :: session
+    type(expect_match) :: match
+
+    match = session%last_match
+  end function last_expect_match
 
   function wait_for_match(session, patterns, timeout_ms) result(match)
     type(expect_session), intent(inout) :: session
@@ -403,6 +462,7 @@ contains
     match%start_index = best_start
     match%end_index = best_end
     match%text = session%transcript(best_start:best_end)
+    session%last_match = match
     session%scan_start = best_end + 1
     found = .true.
   end function try_match_patterns
