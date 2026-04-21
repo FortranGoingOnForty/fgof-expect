@@ -47,6 +47,8 @@ Tracked today:
   integration tests
 - current waits support multiple candidate patterns, default per-session timeouts,
   and case-sensitive or case-insensitive matching
+- `wait_for_string()` preserves exact prompt bytes, while character-array
+  `wait_for_match()` trims fixed-length Fortran padding and ignores blank slots
 
 ## Public API Shape
 
@@ -59,6 +61,7 @@ Public types:
 
 - `expect_options`
 - `expect_match`
+- `expect_pattern`
 - `expect_session`
 
 Public constants:
@@ -83,6 +86,7 @@ Current public procedures:
 - `clear_expect_session`
 - `clear_transcript`
 - `close_expect`
+- `exact_pattern`
 - `expect_backend_name`
 - `expect_error_name`
 - `expect_status_name`
@@ -90,6 +94,7 @@ Current public procedures:
 - `send_line`
 - `send_text`
 - `spawn_expect`
+- `trimmed_pattern`
 - `transcript_text`
 - `wait_for_match`
 - `wait_for_string`
@@ -142,6 +147,17 @@ Two tracked examples ship with the package:
     the echoed result
 
 They are compiled as part of the normal package build and test flow.
+
+For exact multi-pattern waits, including intentional trailing spaces, use
+`expect_pattern` helpers instead of raw character arrays:
+
+```fortran
+type(expect_pattern) :: patterns(2)
+
+patterns(1) = exact_pattern("login: ")
+patterns(2) = exact_pattern("Password: ")
+match = wait_for_match(session, patterns)
+```
 
 ## Build And Test
 
