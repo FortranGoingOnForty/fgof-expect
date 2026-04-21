@@ -27,9 +27,15 @@ module fgof_expect
     FGOF_EXPECT_STATUS_TIMEOUT, &
     expect_match, &
     expect_options, &
+    expect_pattern, &
     expect_session
   implicit none
   private
+
+  interface wait_for_match
+    module procedure wait_for_match_strings
+    module procedure wait_for_match_specs
+  end interface
 
   public :: &
     FGOF_EXPECT_ERR_CLOSE_FAILED, &
@@ -49,8 +55,10 @@ module fgof_expect
     clear_expect_session, &
     clear_transcript, &
     close_expect, &
+    exact_pattern, &
     expect_match, &
     expect_options, &
+    expect_pattern, &
     expect_session, &
     expect_backend_name, &
     expect_error_name, &
@@ -59,6 +67,7 @@ module fgof_expect
     send_line, &
     send_text, &
     transcript_text, &
+    trimmed_pattern, &
     wait_for_match, &
     wait_for_string
   public :: spawn_expect
@@ -81,6 +90,22 @@ contains
     match%end_index = 0
     match%text = ""
   end function clear_expect_match
+
+  function exact_pattern(text) result(pattern)
+    character(len=*), intent(in) :: text
+    type(expect_pattern) :: pattern
+
+    pattern%text = text
+    pattern%trim_trailing = .false.
+  end function exact_pattern
+
+  function trimmed_pattern(text) result(pattern)
+    character(len=*), intent(in) :: text
+    type(expect_pattern) :: pattern
+
+    pattern%text = text
+    pattern%trim_trailing = .true.
+  end function trimmed_pattern
 
   function clear_expect_session() result(session)
     type(expect_session) :: session
@@ -186,11 +211,27 @@ contains
     character(len=*), intent(in) :: pattern
     integer, intent(in), optional :: timeout_ms
     type(expect_match) :: match
-    character(len=len(pattern)) :: patterns(1)
+    type(expect_pattern) :: patterns(1)
 
-    patterns(1) = pattern
-    match = wait_for_match(session, patterns, timeout_ms)
+    patterns(1) = exact_pattern(pattern)
+    match = wait_for_match_specs(session, patterns, timeout_ms)
   end function wait_for_string
+
+  function wait_for_match_strings(session, patterns, timeout_ms) result(match)
+    type(expect_session), intent(inout) :: session
+    character(len=*), intent(in) :: patterns(:)
+    integer, intent(in), optional :: timeout_ms
+    type(expect_match) :: match
+    type(expect_pattern), allocatable :: pattern_specs(:)
+    integer :: i
+
+    allocate(pattern_specs(size(patterns)))
+    do i = 1, size(patterns)
+      pattern_specs(i) = trimmed_pattern(patterns(i))
+    end do
+
+    match = wait_for_match_specs(session, pattern_specs, timeout_ms)
+  end function wait_for_match_strings
 
   logical function send_text(session, text) result(success)
     type(expect_session), intent(inout) :: session
@@ -224,6 +265,7 @@ contains
 
     session%transcript = ""
     session%scan_start = 1
+    session%last_match = clear_expect_match()
   end subroutine clear_transcript
 
   function transcript_text(session) result(text)
@@ -244,9 +286,9 @@ contains
     match = session%last_match
   end function last_expect_match
 
-  function wait_for_match(session, patterns, timeout_ms) result(match)
+  function wait_for_match_specs(session, patterns, timeout_ms) result(match)
     type(expect_session), intent(inout) :: session
-    character(len=*), intent(in) :: patterns(:)
+    type(expect_pattern), intent(in) :: patterns(:)
     integer, intent(in), optional :: timeout_ms
     type(expect_match) :: match
     character(len=:), allocatable :: chunk
@@ -259,6 +301,7 @@ contains
     call clear_error(session)
     call sync_active_state(session)
     match = clear_expect_match()
+    session%last_match = clear_expect_match()
 
     if (.not. valid_patterns(patterns)) then
       call set_error(session, FGOF_EXPECT_ERR_INVALID_PATTERN, "at least one non-empty pattern is required")
@@ -322,7 +365,7 @@ contains
 
       call spin_wait(20)
     end do
-  end function wait_for_match
+  end function wait_for_match_specs
 
   function expect_status_name(status) result(name)
     integer, intent(in) :: status
@@ -349,18 +392,19 @@ contains
   end function valid_expect_options
 
   logical function valid_patterns(patterns) result(valid)
-    character(len=*), intent(in) :: patterns(:)
+    type(expect_pattern), intent(in) :: patterns(:)
     integer :: i
 
     valid = size(patterns) > 0
     if (.not. valid) return
 
     do i = 1, size(patterns)
-      if (len_trim(patterns(i)) <= 0) then
-        valid = .false.
+      if (pattern_length(patterns(i)) > 0) then
+        valid = .true.
         return
       end if
     end do
+    valid = .false.
   end function valid_patterns
 
   subroutine clear_error(session)
@@ -419,11 +463,12 @@ contains
 
   logical function try_match_patterns(session, patterns, match) result(found)
     type(expect_session), intent(inout) :: session
-    character(len=*), intent(in) :: patterns(:)
+    type(expect_pattern), intent(in) :: patterns(:)
     type(expect_match), intent(inout) :: match
     character(len=:), allocatable :: search_text
     character(len=:), allocatable :: pattern_text
     integer :: i
+    integer :: pattern_len
     integer :: relative_pos
     integer :: candidate_start
     integer :: best_start
@@ -443,14 +488,17 @@ contains
     search_text = normalize_for_match(session%transcript(session%scan_start:), session%options%case_sensitive)
 
     do i = 1, size(patterns)
-      pattern_text = normalize_for_match(patterns(i), session%options%case_sensitive)
+      pattern_len = pattern_length(patterns(i))
+      if (pattern_len <= 0) cycle
+
+      pattern_text = normalize_for_match(pattern_text_value(patterns(i)), session%options%case_sensitive)
       relative_pos = index(search_text, pattern_text)
       if (relative_pos <= 0) cycle
 
       candidate_start = session%scan_start + relative_pos - 1
       if (candidate_start < best_start) then
         best_start = candidate_start
-        best_end = candidate_start + len(patterns(i)) - 1
+        best_end = candidate_start + pattern_len - 1
         best_pattern = i
       end if
     end do
@@ -466,6 +514,34 @@ contains
     session%scan_start = best_end + 1
     found = .true.
   end function try_match_patterns
+
+  integer function pattern_length(pattern) result(length)
+    type(expect_pattern), intent(in) :: pattern
+
+    length = len(pattern_text_value(pattern))
+  end function pattern_length
+
+  function pattern_text_value(pattern) result(text)
+    type(expect_pattern), intent(in) :: pattern
+    character(len=:), allocatable :: text
+    integer :: trimmed_len
+
+    if (.not. allocated(pattern%text)) then
+      text = ""
+      return
+    end if
+
+    if (pattern%trim_trailing) then
+      trimmed_len = len_trim(pattern%text)
+      if (trimmed_len <= 0) then
+        text = ""
+      else
+        text = pattern%text(:trimmed_len)
+      end if
+    else
+      text = pattern%text
+    end if
+  end function pattern_text_value
 
   function normalize_for_match(text, case_sensitive) result(normalized)
     character(len=*), intent(in) :: text

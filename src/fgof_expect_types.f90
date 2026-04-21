@@ -31,6 +31,11 @@ module fgof_expect_types
     character(len=:), allocatable :: text
   end type expect_match
 
+  type, public :: expect_pattern
+    character(len=:), allocatable :: text
+    logical :: trim_trailing = .true.
+  end type expect_pattern
+
   type, public :: expect_session
     logical :: active = .false.
     type(expect_options) :: options

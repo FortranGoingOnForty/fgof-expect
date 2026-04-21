@@ -1,5 +1,6 @@
 program test_send_transcript
   use fgof_expect, only : &
+    FGOF_EXPECT_STATUS_IDLE, &
     FGOF_EXPECT_STATUS_MATCHED, &
     clear_expect_options, &
     clear_transcript, &
@@ -43,6 +44,8 @@ program test_send_transcript
 
   call clear_transcript(session)
   if (transcript_text(session) /= "") error stop "clear_transcript should reset transcript text"
+  match = last_expect_match(session)
+  if (match%status /= FGOF_EXPECT_STATUS_IDLE) error stop "clear_transcript should clear the stored last match"
 
   if (.not. send_text(session, "world")) error stop "send_text should support partial writes"
   if (.not. send_text(session, new_line("a"))) error stop "send_text should accept raw newline writes"
