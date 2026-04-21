@@ -33,6 +33,7 @@ Tracked today:
 - transcript-backed `wait_for_string()` and `wait_for_match()` helpers
 - `send_text()` and `send_line()` helpers for interactive request or response flows
 - transcript and last-match helpers for diagnostics and incremental automation
+- tracked examples for login-style prompts and simple REPL automation
 - initial session, options, and match types
 - stable status and error constants with naming helpers
 - CI and `fpm test` baseline wiring
@@ -129,6 +130,18 @@ program demo_expect
   end if
 end program demo_expect
 ```
+
+## Examples
+
+Two tracked examples ship with the package:
+
+- `shell_login`
+  - waits for a login-style prompt, sends a line, and matches the greeting
+- `repl_roundtrip`
+  - drives a tiny shell-loop REPL, waits for a prompt, sends input, and matches
+    the echoed result
+
+They are compiled as part of the normal package build and test flow.
 
 ## Build And Test
 
