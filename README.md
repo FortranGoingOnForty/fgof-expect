@@ -29,8 +29,9 @@ Initial scaffold is in place.
 Tracked today:
 
 - public `fgof_expect` and `fgof_expect_types` modules
+- PTY-backed `spawn_expect()` and `close_expect()` session lifecycle
 - initial session, options, and match types
-- stable status constants and naming helper
+- stable status and error constants with naming helpers
 - CI and `fpm test` baseline wiring
 
 ## Why Use It
@@ -56,6 +57,12 @@ Public types:
 
 Public constants:
 
+- `FGOF_EXPECT_OK`
+- `FGOF_EXPECT_ERR_INVALID_COMMAND`
+- `FGOF_EXPECT_ERR_INVALID_OPTIONS`
+- `FGOF_EXPECT_ERR_SPAWN_FAILED`
+- `FGOF_EXPECT_ERR_CLOSE_FAILED`
+- `FGOF_EXPECT_ERR_INTERNAL`
 - `FGOF_EXPECT_STATUS_IDLE`
 - `FGOF_EXPECT_STATUS_MATCHED`
 - `FGOF_EXPECT_STATUS_TIMEOUT`
@@ -66,25 +73,30 @@ Current public procedures:
 - `clear_expect_match`
 - `clear_expect_options`
 - `clear_expect_session`
+- `close_expect`
+- `expect_backend_name`
+- `expect_error_name`
 - `expect_status_name`
+- `spawn_expect`
 
 ## Quick Start
 
 ```fortran
 program demo_expect
-  use fgof_expect, only : clear_expect_match, clear_expect_session, expect_status_name
-  use fgof_expect_types, only : FGOF_EXPECT_STATUS_TIMEOUT, expect_match, expect_session
+  use fgof_expect, only : close_expect, spawn_expect
+  use fgof_expect_types, only : expect_session
   implicit none
 
   type(expect_session) :: session
-  type(expect_match) :: match
 
-  session = clear_expect_session()
-  match = clear_expect_match()
-  match%status = FGOF_EXPECT_STATUS_TIMEOUT
+  session = spawn_expect("cat")
+  if (session%active) then
+    print *, "session ready"
+  end if
 
-  print *, session%active
-  print *, expect_status_name(match%status)
+  if (.not. close_expect(session)) then
+    print *, session%error_message
+  end if
 end program demo_expect
 ```
 
@@ -106,6 +118,7 @@ That is the baseline verification command locally and in CI.
 - intended to stay independently versioned and releasable
 - focused on expect-style PTY automation, not generic unit-test orchestration
 - `fgof-proc-test` should sit above this package, not inside it
+- `fgof-pty` remains the transport and lifecycle layer underneath this package
 
 ## License
 
